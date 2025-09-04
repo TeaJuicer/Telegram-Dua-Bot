@@ -1,0 +1,79 @@
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+import json
+import os
+
+USER_FILE = "users.json"
+GROUP_CHAT_ID = -SoulAidIslamList  # Replace with your group's chat ID
+
+# Load existing users
+if os.path.exists(USER_FILE):
+    with open(USER_FILE, "r") as f:
+        users = json.load(f)
+else:
+    users = {}
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        # Prevent chatting in group
+        return
+
+    user_id = str(update.effective_user.id)
+    if user_id in users:
+        await update.message.reply_text("You are already signed up! Signup is one-time only.")
+    else:
+        await update.message.reply_text("Welcome! Please provide your Name:")
+        context.user_data['signup_step'] = 'name'
+
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        # Ignore messages in group
+        return
+
+    user_id = str(update.effective_user.id)
+    text = update.message.text
+
+    if user_id not in users:
+        step = context.user_data.get('signup_step')
+
+        if step == 'name':
+            context.user_data['name'] = text
+            context.user_data['signup_step'] = 'father'
+            await update.message.reply_text("Enter your Father's Name:")
+        elif step == 'father':
+            context.user_data['fathers_name'] = text
+            context.user_data['signup_step'] = 'topic'
+            await update.message.reply_text("Enter your Topic of interest:")
+        elif step == 'topic':
+            context.user_data['topic'] = text
+            # Save user info
+            users[user_id] = {
+                'name': context.user_data['name'],
+                'fathers_name': context.user_data['fathers_name'],
+                'topic': context.user_data['topic']
+            }
+            with open(USER_FILE, "w") as f:
+                json.dump(users, f, indent=2)
+            await update.message.reply_text(
+                "Signup complete! Thank you for joining the dua list ❤️"
+            )
+            context.user_data.clear()
+
+            # Send message to group
+            await context.bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text="Another member added to our dua list. You are appreciated <3"
+            )
+    else:
+        # Do not allow further chatting
+        await update.message.reply_text("Signup is one-time only. Thank you!")
+
+if __name__ == "__main__":
+    TOKEN = "8284090147:AAG_Q6xOvOQhubjbn6LWIPwKJK6Egew7mM4"
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("Bot running...")
+    app.run_polling()

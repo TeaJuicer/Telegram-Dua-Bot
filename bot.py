@@ -17,9 +17,8 @@ import os
 GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
-GROUP_CHAT_ID = -1002973160252  # Replace with your actual group chat ID
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # safer than hardcoding
-
+GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 TOPICS_PER_PAGE = 10
 
 TOPIC_BUTTONS = [
@@ -177,12 +176,13 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # create multiple rows (one per topic) with timestamp
         new_rows = []
         now = datetime.now()
+        father_name = context.user_data["Father's Name"]
         for topic in context.user_data["Topics"]:
             new_rows.append({
                 "user_id": user_id,
                 "Gender": context.user_data["Gender"],
                 "Name": context.user_data["Name"],
-                "Father's Name": context.user_data["Father's Name"],
+                "Father's Name": father_name,
                 "Topic": topic,
                 "timestamp": now
             })
@@ -196,7 +196,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         topics_text = "\n".join([f"• {t}" for t in context.user_data["Topics"]])
         private_text = (
             f"Dear {context.user_data['Gender']} {context.user_data['Name']} "
-            f"({context.user_data['Father's Name']}), you will be included in our dua for:\n\n{topics_text}"
+            f"({father_name}), you will be included in our dua for:\n\n{topics_text}"
         )
         try:
             await context.bot.send_message(chat_id=user_id, text=private_text)
@@ -251,4 +251,18 @@ def main():
             GENDER: [CallbackQueryHandler(get_gender, pattern='^(Brother|Sister)$')],
             NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_name)],
             FATHER: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_father)],
-            TOPIC: [CallbackQuery
+            TOPIC: [CallbackQueryHandler(get_topic, pattern='.*')],
+        },
+        fallbacks=[CommandHandler('cancel', cancel)],
+        per_user=True
+    )
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(signup_handler)
+    app.add_handler(CallbackQueryHandler(button, pattern='^(signup|remove)$'))
+
+    print("Bot is starting...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()

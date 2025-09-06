@@ -18,7 +18,7 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
-BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"  # <-- Replace with your token
+BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # <-- Replace with your bot token
 TOPICS_PER_PAGE = 10
 
 # Short label → Full dua text
@@ -112,20 +112,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Welcome! Choose an option:", reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def remove_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
 
-    if query.data == 'remove':
-        df = load_csv()
-        if user_id in df["user_id"].values:
-            df = df[df["user_id"] != user_id]
-            save_csv(df)
-            await query.message.reply_text("✅ Your entry for dua has been removed.")  # Updated message
-        else:
-            await query.message.reply_text("You don't have an entry to remove.")
-        return ConversationHandler.END
+    df = load_csv()
+    if user_id in df["user_id"].values:
+        df = df[df["user_id"] != user_id]
+        save_csv(df)
+        await query.message.reply_text("✅ Your entry for dua has been removed.")
+    else:
+        await query.message.reply_text("⚠️ You don't have an entry to remove.")
+
+    return ConversationHandler.END
 
 async def start_signup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -165,7 +165,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
-    # Paging
+    # Paging buttons
     if data.startswith("PAGE_"):
         page = int(data.split("_")[1])
         await query.edit_message_reply_markup(
@@ -173,7 +173,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return TOPIC
 
-    # Done
+    # DONE button
     if data == "DONE":
         selected_full = context.user_data.get("Topics", [])
         if not selected_full:
@@ -182,7 +182,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         user_id = query.from_user.id
         context.user_data["user_id"] = user_id
-
         df = load_csv()
 
         # Remove entries older than 14 days
@@ -194,7 +193,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         now = datetime.now()
         father_name = context.user_data["Father's Name"]
-
         new_rows = []
         for topic in selected_full:
             new_rows.append({
@@ -232,7 +230,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return ConversationHandler.END
 
-    # Toggle selection
+    # Toggle topic selection
     if data in TOPIC_MAP:
         full_text = TOPIC_MAP[data]
         topics = context.user_data.get("Topics", [])
@@ -242,7 +240,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
             topics.append(full_text)
         context.user_data["Topics"] = topics
 
-    # Keep page
+    # Keep current page
     page = 0
     if query.message.reply_markup:
         for row in query.message.reply_markup.inline_keyboard:
@@ -279,7 +277,7 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(signup_handler)
-    app.add_handler(CallbackQueryHandler(button, pattern='^(signup|remove)$'))
+    app.add_handler(CallbackQueryHandler(remove_entry, pattern='^remove$'))
 
     print("Bot is starting...")
     app.run_polling()

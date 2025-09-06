@@ -18,41 +18,42 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
-BOT_TOKEN = os.getenv("7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")
+BOT_TOKEN = os.getenv("7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")  # <-- set your token in environment
 TOPICS_PER_PAGE = 10
 
-TOPIC_BUTTONS = [
-    "Increase in iman (faith) and taqwa (piety).",
-    "Guidance in difficult decisions and daily life.",
-    "Steadfastness in prayers, fasting, and worship.",
-    "Love for Allah, His Messenger ﷺ, and the Qur'an.",
-    "Forgiveness and protection from sins.",
-    "Physical health and recovery from illness.",
-    "Mental peace, patience, and relief from anxiety.",
-    "Protection from stress, depression, and harmful habits.",
-    "Strength to perform acts of worship despite difficulties.",
-    "Righteousness and success for children and future generations.",
-    "Happy, loving, and respectful marriages.",
-    "Protection and care for parents and elders.",
-    "Family unity, kindness, and mutual understanding.",
-    "Blessings in friendships and community ties.",
-    "Halal and sufficient rizq (sustenance).",
-    "Success in studies, work, or business.",
-    "Protection from debt and financial hardship.",
-    "Opportunities for growth, prosperity, and helping others.",
-    "Safety from accidents, calamities, and harm.",
-    "Protection from evil, envy, black magic, and oppression.",
-    "Security in travel, home, and public life.",
-    "Strength to overcome trials and challenges.",
-    "Patience (sabr) and gratitude (shukr) in all circumstances.",
-    "Humility, honesty, and good character.",
-    "Avoiding arrogance, jealousy, and harmful behavior.",
-    "Excellence in worship and contribution to society.",
-    "Ease in exams, work challenges, or legal matters.",
-    "Healing after loss or grief.",
-    "Guidance in marriage or family decisions.",
-    "Comfort for those struggling with loneliness or hardship."
-]
+# Short label → Full dua text
+TOPIC_MAP = {
+    "Faith & Taqwa": "Increase in iman (faith) and taqwa (piety).",
+    "Guidance": "Guidance in difficult decisions and daily life.",
+    "Worship": "Steadfastness in prayers, fasting, and worship.",
+    "Love for Allah": "Love for Allah, His Messenger ﷺ, and the Qur'an.",
+    "Forgiveness": "Forgiveness and protection from sins.",
+    "Health": "Physical health and recovery from illness.",
+    "Mental Peace": "Mental peace, patience, and relief from anxiety.",
+    "Protection": "Protection from stress, depression, and harmful habits.",
+    "Strength": "Strength to perform acts of worship despite difficulties.",
+    "Children": "Righteousness and success for children and future generations.",
+    "Marriage": "Happy, loving, and respectful marriages.",
+    "Parents": "Protection and care for parents and elders.",
+    "Family": "Family unity, kindness, and mutual understanding.",
+    "Friendships": "Blessings in friendships and community ties.",
+    "Rizq": "Halal and sufficient rizq (sustenance).",
+    "Success": "Success in studies, work, or business.",
+    "Debt Relief": "Protection from debt and financial hardship.",
+    "Opportunities": "Opportunities for growth, prosperity, and helping others.",
+    "Safety": "Safety from accidents, calamities, and harm.",
+    "Evil Protection": "Protection from evil, envy, black magic, and oppression.",
+    "Security": "Security in travel, home, and public life.",
+    "Trials": "Strength to overcome trials and challenges.",
+    "Patience": "Patience (sabr) and gratitude (shukr) in all circumstances.",
+    "Character": "Humility, honesty, and good character.",
+    "Avoid Negativity": "Avoiding arrogance, jealousy, and harmful behavior.",
+    "Excellence": "Excellence in worship and contribution to society.",
+    "Ease": "Ease in exams, work challenges, or legal matters.",
+    "Healing": "Healing after loss or grief.",
+    "Marriage Guidance": "Guidance in marriage or family decisions.",
+    "Comfort": "Comfort for those struggling with loneliness or hardship."
+}
 
 # ----------------- Helper Functions -----------------
 
@@ -70,17 +71,18 @@ def save_csv(df):
 def build_topic_keyboard(selected_topics, page=0):
     start = page * TOPICS_PER_PAGE
     end = start + TOPICS_PER_PAGE
-    topics_on_page = TOPIC_BUTTONS[start:end]
+    topics_on_page = list(TOPIC_MAP.keys())[start:end]
 
     keyboard = []
-    for topic in topics_on_page:
-        text = f"✅ {topic}" if topic in selected_topics else topic
-        keyboard.append([InlineKeyboardButton(text, callback_data=topic)])
+    for short_label in topics_on_page:
+        full_text = TOPIC_MAP[short_label]
+        text = f"✅ {short_label}" if full_text in selected_topics else short_label
+        keyboard.append([InlineKeyboardButton(text, callback_data=short_label)])
 
     nav_buttons = []
     if page > 0:
         nav_buttons.append(InlineKeyboardButton("⬅️ Back", callback_data=f"PAGE_{page-1}"))
-    if end < len(TOPIC_BUTTONS):
+    if end < len(TOPIC_MAP):
         nav_buttons.append(InlineKeyboardButton("➡️ Next", callback_data=f"PAGE_{page+1}"))
     if nav_buttons:
         keyboard.append(nav_buttons)
@@ -166,14 +168,14 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         df = load_csv()
 
-        # Remove all entries older than 30 days globally
+        # Remove all entries older than 30 days
         if "timestamp" in df.columns:
             df = df[df["timestamp"] >= datetime.now() - timedelta(days=30)]
 
         # Remove old entries of this user
         df = df[df["user_id"] != user_id]
 
-        # create multiple rows (one per topic) with timestamp
+        # Save new entries
         new_rows = []
         now = datetime.now()
         father_name = context.user_data["Father's Name"]
@@ -192,7 +194,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text("✅ Your information has been saved!")
 
-        # --- Private DM to user ---
+        # Private DM
         topics_text = "\n".join([f"• {t}" for t in context.user_data["Topics"]])
         private_text = (
             f"Dear {context.user_data['Gender']} {context.user_data['Name']} "
@@ -203,7 +205,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send private message: {e}")
 
-        # --- Group message without name ---
+        # Group message
         group_text = (
             f"Dear {context.user_data['Gender']}, you will be included in our dua for:\n\n{topics_text}"
         )
@@ -214,15 +216,17 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return ConversationHandler.END
 
-    # Toggle topic selection
+    # Toggle selection (short → full text)
     topics = context.user_data.get("Topics", [])
-    if data in topics:
-        topics.remove(data)
-    else:
-        topics.append(data)
+    if data in TOPIC_MAP:
+        full_text = TOPIC_MAP[data]
+        if full_text in topics:
+            topics.remove(full_text)
+        else:
+            topics.append(full_text)
     context.user_data["Topics"] = topics
 
-    # Keep current page
+    # Detect current page
     page = 0
     if query.message.reply_markup:
         for row in query.message.reply_markup.inline_keyboard:
@@ -243,6 +247,10 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- Main -----------------
 
 def main():
+    if not BOT_TOKEN:
+        print("❌ BOT_TOKEN not set! Please set it as environment variable.")
+        return
+
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     signup_handler = ConversationHandler(

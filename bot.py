@@ -18,7 +18,7 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
-BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"  # <-- Insert your token here
+BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"  # <-- Replace with your token
 TOPICS_PER_PAGE = 10
 
 # Short label → Full dua text
@@ -122,7 +122,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id in df["user_id"].values:
             df = df[df["user_id"] != user_id]
             save_csv(df)
-            await query.message.reply_text("Your entry has been removed.")
+            await query.message.reply_text("✅ Your entry for dua has been removed.")  # Updated message
         else:
             await query.message.reply_text("You don't have an entry to remove.")
         return ConversationHandler.END
@@ -184,7 +184,14 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["user_id"] = user_id
 
         df = load_csv()
-        df = df[df["user_id"] != user_id]  # remove old entries
+
+        # Remove entries older than 14 days
+        if "timestamp" in df.columns:
+            df = df[df["timestamp"] >= datetime.now() - timedelta(days=14)]
+
+        # Remove old entries of this user
+        df = df[df["user_id"] != user_id]
+
         now = datetime.now()
         father_name = context.user_data["Father's Name"]
 

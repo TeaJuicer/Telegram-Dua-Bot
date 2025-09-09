@@ -18,7 +18,7 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
-BOT_TOKEN = os.getenv("BOT_TOKEN", "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")  # ✅ Correct env var usage
+BOT_TOKEN = os.getenv("7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")  # ✅ Correct env var usage
 TOPICS_PER_PAGE = 10
 
 TOPIC_BUTTONS = [

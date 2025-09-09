@@ -19,42 +19,19 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
 
-# ✅ Hardcoded bot token (not safe for GitHub)
+# ⚠️ Hardcoded bot token for now (don’t push to GitHub with this exposed!)
 BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"
 
 TOPICS_PER_PAGE = 10
 
 TOPIC_BUTTONS = [
-    "Iman & Taqwa",
-    "Guidance",
-    "Steadfastness",
-    "Love for Allah & Qur'an",
-    "Forgiveness",
-    "Health",
-    "Peace & Patience",
-    "Protection from Stress",
-    "Strength in Worship",
-    "Children's Success",
-    "Marriage",
-    "Parents",
-    "Family Unity",
-    "Friendships",
-    "Halal Rizq",
-    "Success in Work",
-    "No Debt",
-    "Prosperity",
-    "Safety",
-    "Protection from Evil",
-    "Security",
-    "Overcoming Trials",
-    "Sabr & Shukr",
-    "Good Character",
-    "Avoid Arrogance",
-    "Excellence",
-    "Ease in Work",
-    "Healing from Loss",
-    "Marriage Guidance",
-    "Comfort in Hardship"
+    "Iman & Taqwa", "Guidance", "Steadfastness", "Love for Allah & Qur'an",
+    "Forgiveness", "Health", "Peace & Patience", "Protection from Stress",
+    "Strength in Worship", "Children's Success", "Marriage", "Parents",
+    "Family Unity", "Friendships", "Halal Rizq", "Success in Work", "No Debt",
+    "Prosperity", "Safety", "Protection from Evil", "Security", "Overcoming Trials",
+    "Sabr & Shukr", "Good Character", "Avoid Arrogance", "Excellence",
+    "Ease in Work", "Healing from Loss", "Marriage Guidance", "Comfort in Hardship"
 ]
 
 # ----------------- Helper Functions -----------------
@@ -106,6 +83,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
+    print("BUTTON pressed:", query.data)  # 🔍 Debug
 
     if query.data == 'remove':
         df = load_csv()
@@ -154,7 +132,9 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
+    print("TOPIC callback:", data)  # 🔍 Debug
 
+    # Handle paging
     if data.startswith("PAGE_"):
         page = int(data.split("_")[1])
         await query.edit_message_reply_markup(
@@ -167,10 +147,8 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["user_id"] = user_id
 
         df = load_csv()
-
         if "timestamp" in df.columns:
             df = df[df["timestamp"] >= datetime.now() - timedelta(days=14)]
-
         df = df[df["user_id"] != user_id]
 
         new_rows = []
@@ -189,9 +167,15 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
         save_csv(df)
 
-        await query.message.reply_text("✅ Your information has been saved!")
+        # ✅ Clear keyboard
+        await query.edit_message_reply_markup(reply_markup=None)
+
+        # ✅ Confirmation to user
+        await query.message.reply_text(f"✅ Thank you {context.user_data['Gender']}! You will be included in our duas.")
 
         topics_text = "\n".join([f"• {t}" for t in context.user_data["Topics"]])
+
+        # Private message
         private_text = (
             f"Dear {context.user_data['Gender']} {context.user_data['Name']} "
             f"({father_name}), you will be included in our dua for:\n\n{topics_text}"
@@ -201,6 +185,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send private message: {e}")
 
+        # Group message (anonymous, only Brother/Sister)
         group_text = (
             f"Dear {context.user_data['Gender']}, you will be included in our dua for:\n\n{topics_text}"
         )
@@ -211,6 +196,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return ConversationHandler.END
 
+    # Toggle topic selection
     topics = context.user_data.get("Topics", [])
     if data in topics:
         topics.remove(data)
@@ -218,6 +204,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         topics.append(data)
     context.user_data["Topics"] = topics
 
+    # Keep current page
     page = 0
     if query.message.reply_markup:
         for row in query.message.reply_markup.inline_keyboard:
@@ -238,7 +225,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- Main -----------------
 
 def main():
-    print("DEBUG BOT TOKEN:", BOT_TOKEN)  # ✅ Debug check
+    print("DEBUG BOT TOKEN:", BOT_TOKEN)  # 🔍 Debug
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     signup_handler = ConversationHandler(
@@ -254,8 +241,8 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button, pattern='^remove$'))  # ✅ separate remove
     app.add_handler(signup_handler)
-    app.add_handler(CallbackQueryHandler(button, pattern='^(signup|remove)$'))
 
     print("Bot is starting...")
     app.run_polling()

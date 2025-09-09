@@ -18,7 +18,10 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
-BOT_TOKEN = os.getenv("7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")  # ✅ Correct env var usage
+
+# ✅ Hardcoded bot token (not safe for GitHub)
+BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"
+
 TOPICS_PER_PAGE = 10
 
 TOPIC_BUTTONS = [
@@ -152,7 +155,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
-    # Handle paging
     if data.startswith("PAGE_"):
         page = int(data.split("_")[1])
         await query.edit_message_reply_markup(
@@ -166,14 +168,11 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         df = load_csv()
 
-        # Remove entries older than 14 days
         if "timestamp" in df.columns:
             df = df[df["timestamp"] >= datetime.now() - timedelta(days=14)]
 
-        # Remove old entries of this user
         df = df[df["user_id"] != user_id]
 
-        # Create new entries
         new_rows = []
         now = datetime.now()
         father_name = context.user_data["Father's Name"]
@@ -192,7 +191,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text("✅ Your information has been saved!")
 
-        # Private DM
         topics_text = "\n".join([f"• {t}" for t in context.user_data["Topics"]])
         private_text = (
             f"Dear {context.user_data['Gender']} {context.user_data['Name']} "
@@ -203,7 +201,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send private message: {e}")
 
-        # Group message
         group_text = (
             f"Dear {context.user_data['Gender']}, you will be included in our dua for:\n\n{topics_text}"
         )
@@ -214,7 +211,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return ConversationHandler.END
 
-    # Toggle topic selection
     topics = context.user_data.get("Topics", [])
     if data in topics:
         topics.remove(data)
@@ -222,7 +218,6 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         topics.append(data)
     context.user_data["Topics"] = topics
 
-    # Keep current page
     page = 0
     if query.message.reply_markup:
         for row in query.message.reply_markup.inline_keyboard:
@@ -243,6 +238,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- Main -----------------
 
 def main():
+    print("DEBUG BOT TOKEN:", BOT_TOKEN)  # ✅ Debug check
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     signup_handler = ConversationHandler(

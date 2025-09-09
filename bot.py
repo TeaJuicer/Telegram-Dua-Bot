@@ -19,8 +19,8 @@ GENDER, NAME, FATHER, TOPIC = range(4)
 CSV_FILE = "users.csv"
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-1002973160252"))
 
-# ⚠️ Hardcoded bot token for now (don’t push to GitHub with this exposed!)
-BOT_TOKEN = "7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI"
+# ⚠️ Load bot token from environment variable for safety
+BOT_TOKEN = os.getenv("7925554805:AAGCJ-K94SOYhcTCc2hzeYd5kNbra84lEyI")
 
 TOPICS_PER_PAGE = 10
 
@@ -38,7 +38,9 @@ TOPIC_BUTTONS = [
 
 def load_csv():
     try:
-        df = pd.read_csv(CSV_FILE, dtype={"user_id": int}, parse_dates=["timestamp"])
+        df = pd.read_csv(CSV_FILE, dtype={"user_id": int})
+        if "timestamp" in df.columns:
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     except FileNotFoundError:
         df = pd.DataFrame(columns=["user_id", "Gender", "Name", "Father's Name", "Topic", "timestamp"])
         df.to_csv(CSV_FILE, index=False)
@@ -83,15 +85,17 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
-    print("BUTTON pressed:", query.data)  # 🔍 Debug
+    print("BUTTON pressed:", query.data)
 
     if query.data == 'remove':
         df = load_csv()
         if user_id in df["user_id"].values:
             df = df[df["user_id"] != user_id]
             save_csv(df)
+            await query.edit_message_reply_markup(reply_markup=None)
             await query.message.reply_text("✅ Your entry for dua has been removed.")
         else:
+            await query.edit_message_reply_markup(reply_markup=None)
             await query.message.reply_text("⚠️ You don't have an entry to remove.")
         return ConversationHandler.END
 
@@ -132,7 +136,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     data = query.data
-    print("TOPIC callback:", data)  # 🔍 Debug
+    print("TOPIC callback:", data)
 
     # Handle paging
     if data.startswith("PAGE_"):
@@ -147,35 +151,34 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["user_id"] = user_id
 
         df = load_csv()
+        # Keep only recent entries if desired
         if "timestamp" in df.columns:
             df = df[df["timestamp"] >= datetime.now() - timedelta(days=14)]
+        # Remove old entry for this user
         df = df[df["user_id"] != user_id]
 
-        new_rows = []
+        # Save single row per user with all topics
         now = datetime.now()
         father_name = context.user_data["Father's Name"]
-        for topic in context.user_data["Topics"]:
-            new_rows.append({
-                "user_id": user_id,
-                "Gender": context.user_data["Gender"],
-                "Name": context.user_data["Name"],
-                "Father's Name": father_name,
-                "Topic": topic,
-                "timestamp": now
-            })
-
-        df = pd.concat([df, pd.DataFrame(new_rows)], ignore_index=True)
+        new_row = {
+            "user_id": user_id,
+            "Gender": context.user_data["Gender"],
+            "Name": context.user_data["Name"],
+            "Father's Name": father_name,
+            "Topic": ", ".join(context.user_data["Topics"]),
+            "timestamp": now
+        }
+        df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
         save_csv(df)
 
-        # ✅ Clear keyboard
+        # Remove keyboard and send thank you
         await query.edit_message_reply_markup(reply_markup=None)
+        await query.message.reply_text(
+            f"✅ Thank you {context.user_data['Gender']}! You will be included in our duas."
+        )
 
-        # ✅ Confirmation to user
-        await query.message.reply_text(f"✅ Thank you {context.user_data['Gender']}! You will be included in our duas.")
-
+        # Private message with topics
         topics_text = "\n".join([f"• {t}" for t in context.user_data["Topics"]])
-
-        # Private message
         private_text = (
             f"Dear {context.user_data['Gender']} {context.user_data['Name']} "
             f"({father_name}), you will be included in our dua for:\n\n{topics_text}"
@@ -185,7 +188,7 @@ async def get_topic(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             print(f"Failed to send private message: {e}")
 
-        # Group message (anonymous, only Brother/Sister)
+        # Group message (anonymous)
         group_text = (
             f"Dear {context.user_data['Gender']}, you will be included in our dua for:\n\n{topics_text}"
         )
@@ -225,7 +228,11 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ----------------- Main -----------------
 
 def main():
-    print("DEBUG BOT TOKEN:", BOT_TOKEN)  # 🔍 Debug
+    if not BOT_TOKEN:
+        print("ERROR: BOT_TOKEN not set!")
+        return
+
+    print("Bot is starting...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     signup_handler = ConversationHandler(
@@ -241,10 +248,9 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CallbackQueryHandler(button, pattern='^remove$'))  # ✅ separate remove
+    app.add_handler(CallbackQueryHandler(button, pattern='^remove$'))
     app.add_handler(signup_handler)
 
-    print("Bot is starting...")
     app.run_polling()
 
 if __name__ == "__main__":
